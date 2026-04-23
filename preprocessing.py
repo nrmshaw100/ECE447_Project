@@ -1,6 +1,8 @@
 from collections.abc import Hashable, Mapping
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -176,7 +178,23 @@ def clip_RUL(data_dict: Mapping[Hashable, pd.DataFrame], max_RUL: int = 125) -> 
             df["RUL"] = df["RUL"].clip(upper=max_RUL)
     return clipped_data
 
-def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.DataFrame]:
+def train_val_split(data_dict: Mapping[Hashable, pd.DataFrame], test_size: float = 0.3) -> tuple[dict[Hashable, pd.DataFrame], dict[Hashable, pd.DataFrame]]:
+    """Split the datasets into training and validation sets."""
+    train_dict = {}
+    val_dict = {}
+    
+    for key, df in data_dict.items():
+        units = df["Unit Number"].unique()
+        train_units, val_units = train_test_split(units, test_size=test_size, random_state=42)
+        
+        train_dict[key] = df[df["Unit Number"].isin(train_units)].copy()
+        val_dict[key] = df[df["Unit Number"].isin(val_units)].copy()
+        
+    return train_dict, val_dict
+
+
+
+def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[dict[Hashable, pd.DataFrame], dict[Hashable, pd.DataFrame]]:
     """Example pipeline that applies the preprocessing steps in sequence."""
     processed_data, dropped_sensors = drop_low_cv_sensors(data_dict, threshold=0.05)
     processed_data = compute_RUL(processed_data)
@@ -184,4 +202,5 @@ def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.
     processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
     processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
     processed_data = clip_RUL(processed_data, max_RUL=125)
-    return processed_data
+    train_dict, val_dict = train_val_split(processed_data, test_size=0.3)
+    return train_dict, val_dict
