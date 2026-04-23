@@ -156,3 +156,12 @@ def parse_data() -> dict[int, pd.DataFrame]:
         df.columns = ["Unit Number", "Time, In Cycles", "Setting 1", "Setting 2", "Setting 3"] + [f"Sensor {i}" for i in range(1, 22)]
         data_dict[i] = df
     return data_dict
+
+def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.DataFrame]:
+    """Example pipeline that applies the preprocessing steps in sequence."""
+    processed_data, dropped_sensors = drop_low_cv_sensors(processed_data, threshold=0.05)
+    processed_data = compute_RUL(processed_data)
+    sensor_cols = [col for col in processed_data[1].columns if col.startswith("Sensor")]
+    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
+    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
+    return processed_data
