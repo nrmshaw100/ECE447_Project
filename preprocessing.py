@@ -189,7 +189,6 @@ def train_val_split(data_dict: Mapping[Hashable, pd.DataFrame], test_size: float
         
         train_dict[key] = df[df["Unit Number"].isin(train_units)].copy()
         val_dict[key] = df[df["Unit Number"].isin(val_units)].copy()
-        
     return train_dict, val_dict
 
 def standardize_data(train_dict: Mapping[Hashable, pd.DataFrame], val_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.DataFrame]:
@@ -237,3 +236,21 @@ def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[dict[Hashabl
     processed_data = clip_RUL(processed_data, max_RUL=125)
     train_dict, val_dict = train_val_split(processed_data, test_size=0.3)
     return train_dict, val_dict
+
+def roll_mean_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: int = 5) -> dict[Hashable, pd.DataFrame]:
+    for i in data_dict:
+        df = data_dict[i].copy()
+        sensor_cols = [col for col in df.columns if col.startswith("Sensor")]
+        for sensor in sensor_cols:
+            df[f"{sensor}_rolling_mean"] = df[sensor].rolling(window=window_size).mean()
+        data_dict[i] = df
+    return data_dict
+
+def exp_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: int = 5) -> dict[Hashable, pd.DataFrame]:
+    for i in data_dict:
+        df = data_dict[i].copy()
+        sensor_cols = [col for col in df.columns if col.startswith("Sensor")]
+        for sensor in sensor_cols:
+            df[f"{sensor}_exp_smooth"] = df[sensor].ewm(span=window_size).mean()
+        data_dict[i] = df
+    return data_dict
