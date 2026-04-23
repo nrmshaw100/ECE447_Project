@@ -1,5 +1,4 @@
 from collections.abc import Hashable, Mapping
-
 import numpy as np
 import pandas as pd
 
@@ -73,3 +72,87 @@ def drop_low_cv_sensors(
             df.drop(columns=present_sensors, inplace=True)
 
     return filtered_data, sensors_to_drop
+
+def compute_RUL(
+    data_dict: Mapping[Hashable, pd.DataFrame]
+) -> dict[Hashable, pd.DataFrame]:
+    """Compute the RUL for each row in the datasets and add it as a new column.
+        Args:
+        data_dict: Mapping of dataset ids to pandas DataFrames.
+
+    Returns:
+        - a copied dictionary of DataFrames with RUL column
+     RUL column is computed for each time step of each unit.
+    """
+    for i in data_dict:
+        df = data_dict[i].copy()
+        df["RUL"] = df.groupby("Unit Number")["Time, In Cycles"].transform(lambda x: x.max() - x)
+        df["Dataset"] = f"FD00{i}" # adding a column to identify which dataset each row belongs to for combined analysis
+        return df
+
+def compute_lags(
+        data_dict: Mapping[Hashable, pd.DataFrame],
+        sensor_cols: list[str],
+        lags: list[int]
+) -> dict[Hashable, pd.DataFrame]:
+        """Compute lag features for specified sensor columns and lags, and add them as new columns.
+            Args:
+            data_dict: Mapping of dataset ids to pandas DataFrames.
+            sensor_cols: List of sensor column names to compute lags for.
+            lags: List of integer lag values to compute.
+
+        Returns:
+            A dictionary of DataFrames with the computed lag features added as new columns.
+        Lag features are computed for each time step of each unit, and lagged values are aligned with the current time step."""
+
+        lagged_data = {key: df.copy() for key, df in data_dict.items()}
+        for i in data_dict:
+            df = data_dict[i].copy()
+            # creating lag features for each unit to avoid data leaks across units
+            for lag in lags:
+                df_lag = df.groupby("Unit Number")[sensor_cols].shift(lag)
+                df_lag.columns = [f"{col}_lag{lag}" for col in sensor_cols]
+
+                df = df.join(df_lag)
+            lagged_data[i] = df.dropna()
+        return lagged_data
+
+def compute_window_features(
+    data_dict: Mapping[Hashable, pd.DataFrame],
+    sensor_cols: list[str],
+    window_size: int
+) -> dict[Hashable, pd.DataFrame]:
+    """Compute strictly historical rolling window features for each sensor.
+        Args:
+        data_dict: Mapping of dataset ids to pandas DataFrames.
+        sensor_cols: List of sensor column names to compute window features for.
+        window_size: Integer size of the rolling window.
+    Returns:
+    A dictionary of DataFrames with the computed window features added as new columns.
+    Window features are computed for each time step of each unit, and rolling calculations are performed separately for each unit to avoid data leaks across units.
+     Each row only uses prior time steps; the current time step is excluded from its own window.
+     The new columns are named in the format "<sensor>_window{window_size}_mean" and "<sensor>_window{window_size}_std" for the mean and standard deviation features, respectively.
+        """
+    windowed_data = {key: df.copy() for key, df in data_dict.items()}
+    for i in data_dict:
+        df = data_dict[i].copy()
+        # creating rolling window features for each unit to avoid data leaks across units
+        for sensor in sensor_cols:
+            history = df.groupby("Unit Number")[sensor].shift(1)
+            df[f"{sensor}_window{window_size}_mean"] = history.groupby(df["Unit Number"]).transform(
+                lambda x: x.rolling(window=window_size, min_periods=1).mean()
+            )
+            df[f"{sensor}_window{window_size}_std"] = history.groupby(df["Unit Number"]).transform(
+                lambda x: x.rolling(window=window_size, min_periods=1).std()
+            )
+        windowed_data[i] = df.dropna()
+    return windowed_data
+
+def parse_data() -> dict[int, pd.DataFrame]:
+    data_dict = {}
+    for i in range(1,5):
+        df = pd.read_csv(f"CMAPSSData/train_FD00{str(i)}.txt", sep=" ", header=None)
+        df = df.drop(columns=[26, 27])  # Remove the last two empty columns
+        df.columns = ["Unit Number", "Time, In Cycles", "Setting 1", "Setting 2", "Setting 3"] + [f"Sensor {i}" for i in range(1, 22)]
+        data_dict[i] = df
+    return data_dict
