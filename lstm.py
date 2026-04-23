@@ -3,6 +3,7 @@
 # are written
 ###
 
+from collections.abc import Hashable, Mapping
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -10,7 +11,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import LSTM
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
 
@@ -32,8 +33,4 @@ def train_model(train, test, epochs):
 def fit_model(model, train_x, train_y, epochs):
     model.fit(train_x, train_y, epochs=epochs, verbose=1)
     return model
-
-
-
-
 
