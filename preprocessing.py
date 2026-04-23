@@ -178,7 +178,7 @@ def clip_RUL(data_dict: Mapping[Hashable, pd.DataFrame], max_RUL: int = 125) -> 
             df["RUL"] = df["RUL"].clip(upper=max_RUL)
     return clipped_data
 
-def train_val_split(data_dict: Mapping[Hashable, pd.DataFrame], test_size: float = 0.3) -> tuple[dict[Hashable, pd.DataFrame], dict[Hashable, pd.DataFrame]]:
+def train_val_split(data_dict: Mapping[Hashable, pd.DataFrame], test_size: float = 0.3) -> dict[Hashable, dict[Hashable, pd.DataFrame]]:
     """Split the datasets into training and validation sets."""
     train_dict = {}
     val_dict = {}
@@ -190,15 +190,16 @@ def train_val_split(data_dict: Mapping[Hashable, pd.DataFrame], test_size: float
         train_dict[key] = df[df["Unit Number"].isin(train_units)].copy()
         val_dict[key] = df[df["Unit Number"].isin(val_units)].copy()
         
-    return train_dict, val_dict
+    split_dict = {"train": train_dict, "val": val_dict}
+    return split_dict
 
-def standardize_data(train_dict: Mapping[Hashable, pd.DataFrame], val_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.DataFrame]:
+def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]) -> dict[Hashable, pd.DataFrame]:
     """Prepares the data for LSTM by creating sequences.
 
     Returns separated and scaled features and targets, along with their respective scalers.
     """
-    train_df = pd.concat(train_dict.values())
-    val_df = pd.concat(val_dict.values())
+    train_df = pd.concat(split_dict["train"].values())
+    val_df = pd.concat(split_dict["val"].values())
     
     drop_cols = ["Unit Number", "Dataset", "RUL"]
     
@@ -226,8 +227,7 @@ def standardize_data(train_dict: Mapping[Hashable, pd.DataFrame], val_dict: Mapp
     out_dict["target_scaler"] = target_scaler
     return out_dict
 
-
-def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[dict[Hashable, pd.DataFrame], dict[Hashable, pd.DataFrame]]:
+def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, dict[Hashable, pd.DataFrame]]:
     """Example pipeline that applies the preprocessing steps in sequence."""
     processed_data, dropped_sensors = drop_low_cv_sensors(data_dict, threshold=0.05)
     processed_data = compute_RUL(processed_data)
@@ -235,5 +235,5 @@ def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[dict[Hashabl
     processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
     processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
     processed_data = clip_RUL(processed_data, max_RUL=125)
-    train_dict, val_dict = train_val_split(processed_data, test_size=0.3)
-    return train_dict, val_dict
+    split_dict = train_val_split(processed_data, test_size=0.3)
+    return split_dict
