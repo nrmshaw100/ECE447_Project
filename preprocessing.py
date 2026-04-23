@@ -157,6 +157,22 @@ def parse_data() -> dict[int, pd.DataFrame]:
         data_dict[i] = df
     return data_dict
 
+def clip_RUL(data_dict: Mapping[Hashable, pd.DataFrame], max_RUL: int = 125) -> dict[Hashable, pd.DataFrame]:
+    """Clip the RUL values in the datasets to a maximum value.
+
+    Args:
+        data_dict: Mapping of dataset ids to pandas DataFrames, each containing an "RUL" column.
+        max_RUL: Maximum RUL value to clip to. Any RUL values above this will be set to max_RUL.
+
+    Returns:
+        A dictionary of DataFrames with the RUL values clipped to the specified maximum.
+    """
+    clipped_data = {key: df.copy() for key, df in data_dict.items()}
+    for key, df in clipped_data.items():
+        if "RUL" in df.columns:
+            df["RUL"] = df["RUL"].clip(upper=max_RUL)
+    return clipped_data
+
 def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.DataFrame]:
     """Example pipeline that applies the preprocessing steps in sequence."""
     processed_data, dropped_sensors = drop_low_cv_sensors(processed_data, threshold=0.05)
@@ -164,4 +180,5 @@ def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.
     sensor_cols = [col for col in processed_data[1].columns if col.startswith("Sensor")]
     processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
     processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
+    processed_data = clip_RUL(processed_data, max_RUL=125)
     return processed_data
