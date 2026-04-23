@@ -88,7 +88,8 @@ def compute_RUL(
         df = data_dict[i].copy()
         df["RUL"] = df.groupby("Unit Number")["Time, In Cycles"].transform(lambda x: x.max() - x)
         df["Dataset"] = f"FD00{i}" # adding a column to identify which dataset each row belongs to for combined analysis
-        return df
+        data_dict[i] = df
+    return data_dict
 
 def compute_lags(
         data_dict: Mapping[Hashable, pd.DataFrame],
@@ -132,7 +133,7 @@ def compute_window_features(
     Window features are computed for each time step of each unit, and rolling calculations are performed separately for each unit to avoid data leaks across units.
      Each row only uses prior time steps; the current time step is excluded from its own window.
      The new columns are named in the format "<sensor>_window{window_size}_mean" and "<sensor>_window{window_size}_std" for the mean and standard deviation features, respectively.
-        """
+    """
     windowed_data = {key: df.copy() for key, df in data_dict.items()}
     for i in data_dict:
         df = data_dict[i].copy()
@@ -149,6 +150,8 @@ def compute_window_features(
     return windowed_data
 
 def parse_data() -> dict[int, pd.DataFrame]:
+    """Parse the original CMAPSS datasets from the text files and return a dictionary of DataFrames.
+    """
     data_dict = {}
     for i in range(1,5):
         df = pd.read_csv(f"CMAPSSData/train_FD00{str(i)}.txt", sep=" ", header=None)
@@ -175,9 +178,9 @@ def clip_RUL(data_dict: Mapping[Hashable, pd.DataFrame], max_RUL: int = 125) -> 
 
 def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.DataFrame]:
     """Example pipeline that applies the preprocessing steps in sequence."""
-    processed_data, dropped_sensors = drop_low_cv_sensors(processed_data, threshold=0.05)
+    processed_data, dropped_sensors = drop_low_cv_sensors(data_dict, threshold=0.05)
     processed_data = compute_RUL(processed_data)
-    sensor_cols = [col for col in processed_data[1].columns if col.startswith("Sensor")]
+    sensor_cols = [col for col in data_dict[1].columns.drop(dropped_sensors) if col.startswith("Sensor")]
     processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
     processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
     processed_data = clip_RUL(processed_data, max_RUL=125)
