@@ -242,8 +242,8 @@ def roll_mean_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: in
         df = data_dict[i].copy()
         sensor_cols = [col for col in df.columns if col.startswith("Sensor")]
         for sensor in sensor_cols:
-            df[f"{sensor}_rolling_mean"] = df[sensor].rolling(window=window_size).mean()
-        data_dict[i] = df
+            df[f"{sensor}"] = df[sensor].rolling(window=window_size).mean()
+        data_dict[i] = df.dropna()
     return data_dict
 
 def exp_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: int = 5) -> dict[Hashable, pd.DataFrame]:
@@ -251,6 +251,6 @@ def exp_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: int = 5)
         df = data_dict[i].copy()
         sensor_cols = [col for col in df.columns if col.startswith("Sensor")]
         for sensor in sensor_cols:
-            df[f"{sensor}_exp_smooth"] = df[sensor].ewm(span=window_size).mean()
-        data_dict[i] = df
+            df[f"{sensor}"] = df[sensor].ewm(span=window_size).mean()
+        data_dict[i] = df.dropna()
     return data_dict
