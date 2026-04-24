@@ -251,8 +251,8 @@ def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, dic
     processed_data, dropped_sensors = drop_low_cv_sensors(data_dict, threshold=0.05)
     processed_data = compute_RUL(processed_data)
     sensor_cols = [col for col in data_dict[1].columns.drop(dropped_sensors) if col.startswith("Sensor")]
-    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
-    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
+    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 5, 20])
+    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=10)
     processed_data = clip_RUL(processed_data, max_RUL=125)
     split_dict = train_val_split(processed_data, test_size=0.3)
     return split_dict
@@ -261,8 +261,8 @@ def pipeline_B(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.
     processed_data = compute_RUL(data_dict)
     processed_data = exp_smooth(processed_data, window_size=10)
     sensor_cols = [col for col in data_dict[1].columns if col.startswith("Sensor")]
-    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
-    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
+    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 5, 20])
+    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=10)
     processed_data = clip_RUL(processed_data, max_RUL=125)
     split_dict = train_val_split(processed_data, test_size=0.3)
     #Min max scale
