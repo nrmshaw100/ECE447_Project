@@ -16,7 +16,7 @@ def run_mlflow_experiment(model_trainer, X_train, y_train, X_test, y_test, run_n
     with mlflow.start_run(run_name=run_name) as run:
         # Train model
         model = model_trainer(X_train, y_train)
-        mlflow.sklearn.log_model(model, "model")
+        #mlflow.sklearn.log_model(model, "model")
         # evaluate performance
         eval_metrics, _ = evaluate_model_numerics(model, X_test, y_test)
         mlflow.log_metrics(eval_metrics)
