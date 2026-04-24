@@ -2,13 +2,7 @@ from collections.abc import Hashable, Mapping
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-
-
-def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Placeholder for future preprocessing pipeline steps."""
-    return df.copy()
-
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 def _coefficient_of_variation(series: pd.Series) -> float:
     """Return abs(std / mean), or infinity when the mean is effectively zero."""
@@ -96,7 +90,7 @@ def compute_RUL(
 def compute_lags(
         data_dict: Mapping[Hashable, pd.DataFrame],
         sensor_cols: list[str],
-        lags: list[int]
+        lags: list[int] = [1, 2, 3]
 ) -> dict[Hashable, pd.DataFrame]:
         """Compute lag features for specified sensor columns and lags, and add them as new columns.
             Args:
@@ -238,6 +232,20 @@ def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]
     out_dict["target_scaler"] = target_scaler
     return out_dict
 
+def target_feature_split(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[pd.DataFrame, pd.Series]:
+    """Split the data into features (X) and target (y).
+        Args: 
+        data_dict: Mapping of dataset ids to pandas DataFrames.
+        
+        returns:
+        tuple of features (X) and target (y) as (X,y)
+        """
+    drop_cols = ["Unit Number", "Dataset", "RUL"]
+    df = pd.concat(data_dict.values())
+    X = df.drop(columns=drop_cols, errors="ignore")
+    y = df[["RUL"]]
+    return X, y
+
 def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, dict[Hashable, pd.DataFrame]]:
     """Example pipeline that applies the preprocessing steps in sequence."""
     processed_data, dropped_sensors = drop_low_cv_sensors(data_dict, threshold=0.05)
@@ -249,13 +257,24 @@ def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, dic
     split_dict = train_val_split(processed_data, test_size=0.3)
     return split_dict
 
+def pipeline_B(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.DataFrame]:
+    processed_data = compute_RUL(data_dict)
+    processed_data = exp_smooth(processed_data, window_size=10)
+    sensor_cols = [col for col in data_dict[1].columns if col.startswith("Sensor")]
+    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
+    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
+    processed_data = clip_RUL(processed_data, max_RUL=125)
+    split_dict = train_val_split(processed_data, test_size=0.3)
+    #Min max scale
+    return split_dict
+
 def roll_mean_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: int = 5) -> dict[Hashable, pd.DataFrame]:
     for i in data_dict:
         df = data_dict[i].copy()
         sensor_cols = [col for col in df.columns if col.startswith("Sensor")]
         for sensor in sensor_cols:
-            df[f"{sensor}_rolling_mean"] = df[sensor].rolling(window=window_size).mean()
-        data_dict[i] = df
+            df[f"{sensor}"] = df[sensor].rolling(window=window_size).mean()
+        data_dict[i] = df.dropna()
     return data_dict
 
 def exp_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: int = 5) -> dict[Hashable, pd.DataFrame]:
@@ -263,6 +282,6 @@ def exp_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: int = 5)
         df = data_dict[i].copy()
         sensor_cols = [col for col in df.columns if col.startswith("Sensor")]
         for sensor in sensor_cols:
-            df[f"{sensor}_exp_smooth"] = df[sensor].ewm(span=window_size).mean()
-        data_dict[i] = df
+            df[f"{sensor}"] = df[sensor].ewm(span=window_size).mean()
+        data_dict[i] = df.dropna()
     return data_dict
