@@ -221,6 +221,20 @@ def scale_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]) -> d
     out_dict["target_scaler"] = target_scaler
     return out_dict
 
+def target_feature_split(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[pd.DataFrame, pd.Series]:
+    """Split the data into features (X) and target (y).
+        Args: 
+        data_dict: Mapping of dataset ids to pandas DataFrames.
+        
+        returns:
+        tuple of features (X) and target (y) as (X,y)
+        """
+    drop_cols = ["Unit Number", "Dataset", "RUL"]
+    df = pd.concat(data_dict.values())
+    X = df.drop(columns=drop_cols, errors="ignore")
+    y = df[["RUL"]]
+    return X, y
+
 def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]) -> dict[Hashable, pd.DataFrame]:
     """Prepares the data for LSTM by creating sequences.
 
