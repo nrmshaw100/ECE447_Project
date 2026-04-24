@@ -1,0 +1,22 @@
+artifact_path: /home/nolan/ECE447_Project/mlruns/2/models/m-6bf618f86e8643c8b43714da35776af9/artifacts
+flavors:
+  python_function:
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.tensorflow
+    python_version: 3.11.14
+  tensorflow:
+    code: null
+    data: data
+    keras_version: 2.19.1
+    model_type: keras
+    save_format: tf
+mlflow_version: 3.9.0
+model_id: m-6bf618f86e8643c8b43714da35776af9
+model_size_bytes: 1545495
+model_uuid: m-6bf618f86e8643c8b43714da35776af9
+prompts: null
+run_id: b2185eec330e4994be382153fdd6baf8
+utc_time_created: '2026-04-24 11:23:55.476084'
