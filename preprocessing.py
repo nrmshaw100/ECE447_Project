@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from typing import Union
 
 def _coefficient_of_variation(series: pd.Series) -> float:
     """Return abs(std / mean), or infinity when the mean is effectively zero."""
@@ -90,7 +91,8 @@ def compute_RUL(
 def compute_lags(
         data_dict: Mapping[Hashable, pd.DataFrame],
         sensor_cols: list[str],
-        lags: list[int] = [1, 2, 3]
+        lags: list[int] = [1, 2, 3],
+        drop_na: bool = True,
 ) -> dict[Hashable, pd.DataFrame]:
         """Compute lag features for specified sensor columns and lags, and add them as new columns.
             Args:
@@ -111,13 +113,17 @@ def compute_lags(
                 df_lag.columns = [f"{col}_lag{lag}" for col in sensor_cols]
 
                 df = df.join(df_lag)
-            lagged_data[i] = df.dropna()
+                if drop_na:
+                    lagged_data[i] = df.dropna()
+                else:
+                    lagged_data[i] = df
         return lagged_data
 
 def compute_window_features(
     data_dict: Mapping[Hashable, pd.DataFrame],
     sensor_cols: list[str],
-    window_size: int
+    window_size: int,
+    drop_na: bool = True,
 ) -> dict[Hashable, pd.DataFrame]:
     """Compute strictly historical rolling window features for each sensor.
         Args:
@@ -142,7 +148,10 @@ def compute_window_features(
             df[f"{sensor}_window{window_size}_std"] = history.groupby(df["Unit Number"]).transform(
                 lambda x: x.rolling(window=window_size, min_periods=1).std()
             )
-        windowed_data[i] = df.dropna()
+            if drop_na:
+                windowed_data[i] = df.dropna()
+            else:
+                windowed_data[i] = df
     return windowed_data
 
 def parse_data() -> dict[int, pd.DataFrame]:
@@ -193,8 +202,8 @@ def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]
     Returns separated and scaled features and targets, along with their respective scalers.
     """
     # Concatenate all dataframes in the train and val dictionaries
-    train_df = pd.concat(split_dict["train"].values())
-    val_df = pd.concat(split_dict["val"].values())
+    train_df = pd.concat(split_dict["train"].values(), ignore_index=True)
+    val_df = pd.concat(split_dict["val"].values(), ignore_index=True)
 
     train_temp = train_df.pop("Time, In Cycles")
     val_temp = val_df.pop("Time, In Cycles")
@@ -232,16 +241,19 @@ def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]
     out_dict["target_scaler"] = target_scaler
     return out_dict
 
-def target_feature_split(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[pd.DataFrame, pd.Series]:
+def target_feature_split(data: Union[pd.DataFrame, Mapping[Hashable, pd.DataFrame]]) -> tuple[pd.DataFrame, pd.Series]:
     """Split the data into features (X) and target (y).
         Args: 
-        data_dict: Mapping of dataset ids to pandas DataFrames.
+        data: Mapping of dataset ids to pandas DataFrames, or a single DataFrame.
         
         returns:
         tuple of features (X) and target (y) as (X,y)
         """
     drop_cols = ["Unit Number", "Dataset", "RUL"]
-    df = pd.concat(data_dict.values())
+    if isinstance(data, pd.DataFrame):
+        df = data
+    else:
+        df = pd.concat(data.values())
     X = df.drop(columns=drop_cols, errors="ignore")
     y = df[["RUL"]]
     return X, y
@@ -251,8 +263,8 @@ def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, dic
     processed_data, dropped_sensors = drop_low_cv_sensors(data_dict, threshold=0.05)
     processed_data = compute_RUL(processed_data)
     sensor_cols = [col for col in data_dict[1].columns.drop(dropped_sensors) if col.startswith("Sensor")]
-    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
-    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
+    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 5, 20])
+    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=10)
     processed_data = clip_RUL(processed_data, max_RUL=125)
     split_dict = train_val_split(processed_data, test_size=0.3)
     return split_dict
@@ -261,8 +273,8 @@ def pipeline_B(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.
     processed_data = compute_RUL(data_dict)
     processed_data = exp_smooth(processed_data, window_size=10)
     sensor_cols = [col for col in data_dict[1].columns if col.startswith("Sensor")]
-    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
-    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
+    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 5, 20])
+    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=10)
     processed_data = clip_RUL(processed_data, max_RUL=125)
     split_dict = train_val_split(processed_data, test_size=0.3)
     #Min max scale

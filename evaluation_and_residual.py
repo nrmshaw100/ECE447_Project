@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import pandas as pd
-from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score, mean_squared_error
 
 
 def forecast_error_overtime_plot(y_true, y_pred):
@@ -66,11 +66,13 @@ def evaluate_model_numerics(model, X_test, y_test):
     rmse = root_mean_squared_error(y_test, predictions)
     mae = mean_absolute_error(y_test, predictions)
     r2 = r2_score(y_test, predictions)
+    mse = mean_squared_error(y_test, predictions)
     
     metrics = {
         "rmse": float(rmse),
         "mae": float(mae),
-        "r2_score": float(r2)
+        "r2_score": float(r2),
+        "mse": float(mse)
     }
     
     return metrics, predictions

@@ -1,5 +1,6 @@
 name: ece447
 channels:
+  - conda-forge
   - defaults
 dependencies:
   - python=3.11
@@ -9,10 +10,8 @@ dependencies:
   - seaborn
   - notebook
   - numpy
-  - wandb
   - mlflow
   - ipywidgets
   - jupyterlab
   - tensorflow
   - optuna
-prefix: /home/nolan/miniconda3/envs/ece447

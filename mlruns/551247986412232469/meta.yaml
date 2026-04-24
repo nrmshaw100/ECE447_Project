@@ -1,0 +1,8 @@
+artifact_location: file:///C:/Users/nrmsh/OneDrive/Documents/GitHub/ECE447_Project/mlruns/551247986412232469
+creation_time: 1777059576093
+experiment_id: '551247986412232469'
+last_update_time: 1777059576093
+lifecycle_stage: active
+name: LinReg_hyperparameter_tuning
+trace_location: null
+workspace: default
