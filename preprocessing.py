@@ -198,8 +198,12 @@ def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]
 
     Returns separated and scaled features and targets, along with their respective scalers.
     """
+    # Concatenate all dataframes in the train and val dictionaries
     train_df = pd.concat(split_dict["train"].values())
     val_df = pd.concat(split_dict["val"].values())
+
+    train_temp = train_df.pop("Time, In Cycles")
+    val_temp = val_df.pop("Time, In Cycles")
     
     drop_cols = ["Unit Number", "Dataset", "RUL"]
     
@@ -211,12 +215,19 @@ def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]
     y_val = val_df[["RUL"]]
 
     feature_scaler = StandardScaler()
-    X_train_scaled = feature_scaler.fit_transform(X_train)
-    X_val_scaled = feature_scaler.transform(X_val)
+    X_train_scaled = pd.DataFrame(index=X_train.index, columns=X_train.columns)
+    X_train_scaled[X_train.columns] = feature_scaler.fit_transform(X_train)
     
+    X_val_scaled = pd.DataFrame(index=X_val.index, columns=X_val.columns)
+    X_val_scaled[X_val.columns] = feature_scaler.transform(X_val)
+    
+    # add the time back to the columns
+    X_train_scaled.insert(0, "Time, In Cycles", train_temp)
+    X_val_scaled.insert(0, "Time, In Cycles", val_temp)
+
     target_scaler = StandardScaler()
-    y_train_scaled = target_scaler.fit_transform(y_train)
-    y_val_scaled = target_scaler.transform(y_val)
+    y_train_scaled = pd.DataFrame(target_scaler.fit_transform(y_train), index=y_train.index, columns=["RUL"])
+    y_val_scaled = pd.DataFrame(target_scaler.transform(y_val), index=y_val.index, columns=["RUL"])
 
     out_dict = {}
     out_dict["X_train_scaled"] = X_train_scaled

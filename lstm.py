@@ -9,22 +9,25 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import LSTM
+from tensorflow.keras.layers import Dense, LSTM, Dropout
+
+from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
+import mlflow
+import optuna
 
-def build_combined_tf_dataset(df: pd.DataFrame, feature_cols: list, target_col: str, time_steps: int, batch_size: int = 32) -> tf.data.Dataset:
+def build_combined_tf_dataset(df_X: np.ndarray, df_Y: np.ndarray, ref_df: pd.DataFrame, time_steps: int, batch_size: int = 32) -> tf.data.Dataset:
     """
     Builds a combined tf.data.Dataset across multiple engine units to prevent data leakage.
     Assumes the DataFrame is already scaled and contains a 'Unit Number' column.
-    """
+    """ 
     combined_dataset = None
-
-    for unit_id, group in df.groupby("Unit Number"):
-        X = group[feature_cols].values
-        y = group[target_col].values
+    
+    for unit_id, group in ref_df.groupby(["Unit Number", "Dataset"]):
+        X = df_X.loc[group.index].values
+        y = df_Y.loc[group.index].values
 
         # Ensure the engine has at least enough rows to form one sequence
         if len(X) < time_steps:
@@ -48,17 +51,60 @@ def build_combined_tf_dataset(df: pd.DataFrame, feature_cols: list, target_col: 
     # Prefetch for performance optimization during training
     return combined_dataset.prefetch(tf.data.AUTOTUNE)
 
-def train_lstm_model(data_dict: Mapping[Hashable, pd.DataFrame], epochs: int, num_neurons: int, timesteps: int):
-    model = Sequential([
-        LSTM(num_neurons, input_shape=(timesteps)),
-        Dense(1)
-    ])
-    model.compile(loss='mae', optimizer='adam')
-    # train the model
-    model.fit(data_dict["X_train"], data_dict["y_train"], epochs=epochs, verbose=1)
-    return model, data_dict["X_test"], data_dict["y_test"]
+class Objective:
+    def __init__(self, train, val):
+        self.train = train
+        self.val = val
 
-# train the model using model.fit
-def fit_model(model, train_x, train_y, epochs):
-    model.fit(train_x, train_y, epochs=epochs, verbose=1)
-    return model
+    def __call__(self, trial):
+        with mlflow.start_run(nested=True, run_name=f"trial_{trial.number}"):
+            # 1. Hyperparameters
+            num_neurons = trial.suggest_int("num_neurons", 32, 128, step=32)
+            epochs = trial.suggest_int("epochs", 10, 100, step=10)
+            dropout_rate = trial.suggest_float("dropout_rate", 0.1, 0.5, step=0.1)
+            
+            # Log params
+            mlflow.log_params({
+                "num_neurons": num_neurons,
+                "epochs": epochs,
+                "dropout_rate": dropout_rate
+            })
+
+            # Fix 1: Use self.train and safely grab the feature dimension
+            num_features = self.train.element_spec[0].shape[-1] 
+
+            # 2. Build Model
+            model = Sequential([
+                LSTM(num_neurons, input_shape=(None, num_features)),
+                Dropout(dropout_rate),
+                Dense(1)
+            ])
+            model.compile(loss='mae', optimizer='adam')
+
+            early_stopping = EarlyStopping(
+                monitor='val_loss',
+                patience=10,  
+                restore_best_weights=True,
+                verbose=1
+            )
+
+            history = model.fit(
+                self.train, 
+                epochs=epochs, 
+                verbose=1, 
+                validation_data=self.val, 
+                shuffle=False, 
+                callbacks=[early_stopping]
+            )
+
+            best_val_loss = min(history.history['val_loss'])
+            
+            # Log the metric to MLflow
+            mlflow.log_metric("val_loss", best_val_loss)
+
+            # HOW TO LOG THE MODEL:
+            # This saves the model architecture, weights, and training configuration
+            mlflow.tensorflow.log_model(model, artifact_path="model")
+
+            # Fix 4: Return the target metric for Optuna
+            return best_val_loss
