@@ -39,23 +39,31 @@ def main():
 
     # pipeline B data preprocessing
     pipe_B = preprocessing.pipeline_B(data_dict)
-    [train_B, val_B] = [pipe_B[i] for i in pipe_B]
-    xB_train, yB_train = preprocessing.target_feature_split(train_B)
-    xB_val, yB_val = preprocessing.target_feature_split(val_B)
+    train_ref_B = pd.concat(pipe_B["train"].values(), ignore_index=True)
+    val_ref_B = pd.concat(pipe_B["val"].values(), ignore_index=True)
+    xB_train, yB_train = preprocessing.target_feature_split(train_ref_B)
+    xB_val, yB_val = preprocessing.target_feature_split(val_ref_B)
 
     #train-validation feature matrix and target vector
-    xB_train_minMax = MinMaxScaler().fit_transform(xB_train)
-    yB_train_minMax = MinMaxScaler().fit_transform(yB_train)
-    xB_val_minMax = MinMaxScaler().fit_transform(xB_val)
-    yB_val_minMax = MinMaxScaler().fit_transform(yB_val)
+    xB_scaler = MinMaxScaler()
+    yB_scaler = MinMaxScaler()
+    xB_train_minMax = xB_scaler.fit_transform(xB_train)
+    xB_val_minMax = xB_scaler.transform(xB_val)
+    yB_train_minMax = yB_scaler.fit_transform(yB_train.values.reshape(-1, 1)).flatten()
+    yB_val_minMax = yB_scaler.transform(yB_val.values.reshape(-1, 1)).flatten()
 
     # pipeline C preprocessing
     pipe_C_split = preprocessing.train_val_split(data_dict.copy(), test_size=0.3)
-    [train_C, val_C] = [pipe_C_split[i] for i in pipe_C_split]
+    train_ref_C = pd.concat(pipe_C_split["train"].values(), ignore_index=True)
+    val_ref_C = pd.concat(pipe_C_split["val"].values(), ignore_index=True)
 
     #train-validation feature matrix and target vector
-    xC_train, yC_train = preprocessing.target_feature_split(train_C)
-    xC_val, yC_val = preprocessing.target_feature_split(val_C)
+    xC_train, yC_train = preprocessing.target_feature_split(train_ref_C)
+    xC_val, yC_val = preprocessing.target_feature_split(val_ref_C)
+    xC_train_raw = xC_train.values
+    xC_val_raw = xC_val.values
+    yC_train_raw = yC_train.values.reshape(-1, 1).flatten()
+    yC_val_raw = yC_val.values.reshape(-1, 1).flatten()
 
     # need to rearrange the data so that it plays nicely with the LSTM model. There is no feature engineering 
     # or preprocessing that happens in this step

@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, Dropout
 from tensorflow.keras.layers import Dense, LSTM, Dropout, Input
 
 from tensorflow.keras.callbacks import EarlyStopping
@@ -26,7 +25,6 @@ def build_combined_tf_dataset(df_X: np.ndarray, df_Y: np.ndarray, ref_df: pd.Dat
     Builds a combined tf.data.Dataset across multiple engine units to prevent data leakage.
     Assumes the DataFrame is already scaled and contains a 'Unit Number' column.
     """ 
-    combined_dataset = None
     X_list = []
     y_list = []
     
@@ -44,32 +42,19 @@ def build_combined_tf_dataset(df_X: np.ndarray, df_Y: np.ndarray, ref_df: pd.Dat
             continue
 
         # The target for a sequence of length T should be the RUL at the final step of that window
-        targets = y[time_steps - 1:]
         num_seqs = len(X) - time_steps + 1
         X_seq = np.array([X[i : i + time_steps] for i in range(num_seqs)], dtype=np.float32)
         y_seq = y[time_steps - 1:].astype(np.float32)
         
-        unit_ds = tf.keras.utils.timeseries_dataset_from_array(
-            data=X,
-            targets=targets,
-            sequence_length=time_steps,
-            batch_size=64 # Arbitrary initial batch size for generation
-        )
         X_list.append(X_seq)
         y_list.append(y_seq)
 
     if not X_list:
         return None
         
-        # Unbatch immediately so we can globally shuffle individual sequences later
-        unit_ds = unit_ds.unbatch()
     X_all = np.concatenate(X_list, axis=0)
     y_all = np.concatenate(y_list, axis=0)
 
-        if combined_dataset is None:
-            combined_dataset = unit_ds
-        else:
-            combined_dataset = combined_dataset.concatenate(unit_ds)
     combined_dataset = tf.data.Dataset.from_tensor_slices((X_all, y_all))
 
     if shuffle and combined_dataset is not None:
@@ -105,11 +90,13 @@ class Objective:
             batch_size = 128
             
             # Log ALL params (added timesteps and batch_size)
-            mlflow.log_params({
+            param_dict = {
                 "num_neurons": num_neurons,
                 "dropout_rate": dropout_rate,
                 "learning_rate": lr
-            })
+            }
+
+            mlflow.log_params(param_dict)
 
             # 2. Build the datasets dynamically for THIS specific trial
             train_ds = build_combined_tf_dataset(
@@ -127,7 +114,6 @@ class Objective:
 
             # Build Model
             model = Sequential([
-                LSTM(num_neurons, input_shape=(None, num_features)),
                 Input(shape=(None, num_features)),
                 LSTM(num_neurons),
                 Dropout(dropout_rate),
@@ -142,7 +128,8 @@ class Objective:
                 jit_compile=True,
                 metrics=[
                     tf.keras.metrics.MeanAbsoluteError(name="mae"),
-                    tf.keras.metrics.R2Score(name="r2")
+                    tf.keras.metrics.R2Score(name="r2"),
+                    tf.keras.metrics.RootMeanSquaredError(name="rmse")
     ]
 )
 
@@ -152,6 +139,8 @@ class Objective:
                 restore_best_weights=True,
                 verbose=1
             )
+
+            print(param_dict)
 
             history = model.fit(
                 train_ds, 
