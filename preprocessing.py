@@ -2,13 +2,7 @@ from collections.abc import Hashable, Mapping
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-
-
-def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Placeholder for future preprocessing pipeline steps."""
-    return df.copy()
-
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 def _coefficient_of_variation(series: pd.Series) -> float:
     """Return abs(std / mean), or infinity when the mean is effectively zero."""
@@ -96,7 +90,7 @@ def compute_RUL(
 def compute_lags(
         data_dict: Mapping[Hashable, pd.DataFrame],
         sensor_cols: list[str],
-        lags: list[int]
+        lags: list[int] = [1, 2, 3]
 ) -> dict[Hashable, pd.DataFrame]:
         """Compute lag features for specified sensor columns and lags, and add them as new columns.
             Args:
@@ -193,6 +187,40 @@ def train_val_split(data_dict: Mapping[Hashable, pd.DataFrame], test_size: float
     split_dict = {"train": train_dict, "val": val_dict}
     return split_dict
 
+def scale_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]) -> dict[Hashable, pd.DataFrame]:
+    """Prepares the data for LSTM by creating sequences.
+
+    Returns separated and scaled features and targets, along with their respective scalers.
+    """
+    train_df = pd.concat(split_dict["train"].values())
+    val_df = pd.concat(split_dict["val"].values())
+    
+    drop_cols = ["Unit Number", "Dataset", "RUL"]
+    
+    # Separate features (X) and target (y)
+    X_train = train_df.drop(columns=drop_cols, errors="ignore")
+    y_train = train_df[["RUL"]]
+    
+    X_val = val_df.drop(columns=drop_cols, errors="ignore")
+    y_val = val_df[["RUL"]]
+
+    feature_scaler = MinMaxScaler()
+    X_train_scaled = feature_scaler.fit_transform(X_train)
+    X_val_scaled = feature_scaler.transform(X_val)
+    
+    target_scaler = MinMaxScaler()
+    y_train_scaled = target_scaler.fit_transform(y_train)
+    y_val_scaled = target_scaler.transform(y_val)
+
+    out_dict = {}
+    out_dict["X_train_scaled"] = X_train_scaled
+    out_dict["y_train_scaled"] = y_train_scaled
+    out_dict["X_val_scaled"] = X_val_scaled
+    out_dict["y_val_scaled"] = y_val_scaled
+    out_dict["feature_scaler"] = feature_scaler
+    out_dict["target_scaler"] = target_scaler
+    return out_dict
+
 def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]) -> dict[Hashable, pd.DataFrame]:
     """Prepares the data for LSTM by creating sequences.
 
@@ -236,6 +264,17 @@ def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, dic
     processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
     processed_data = clip_RUL(processed_data, max_RUL=125)
     split_dict = train_val_split(processed_data, test_size=0.3)
+    return split_dict
+
+def pipeline_B(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, pd.DataFrame]:
+    processed_data = compute_RUL(data_dict)
+    processed_data = exp_smooth(processed_data, window_size=10)
+    sensor_cols = [col for col in data_dict[1].columns if col.startswith("Sensor")]
+    processed_data = compute_lags(processed_data, sensor_cols=sensor_cols, lags=[1, 2, 3])
+    processed_data = compute_window_features(processed_data, sensor_cols=sensor_cols, window_size=5)
+    processed_data = clip_RUL(processed_data, max_RUL=125)
+    split_dict = train_val_split(processed_data, test_size=0.3)
+    #Min max scale
     return split_dict
 
 def roll_mean_smooth(data_dict: Mapping[Hashable, pd.DataFrame], window_size: int = 5) -> dict[Hashable, pd.DataFrame]:
