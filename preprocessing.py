@@ -187,40 +187,6 @@ def train_val_split(data_dict: Mapping[Hashable, pd.DataFrame], test_size: float
     split_dict = {"train": train_dict, "val": val_dict}
     return split_dict
 
-def scale_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]) -> dict[Hashable, pd.DataFrame]:
-    """Prepares the data for LSTM by creating sequences.
-
-    Returns separated and scaled features and targets, along with their respective scalers.
-    """
-    train_df = pd.concat(split_dict["train"].values())
-    val_df = pd.concat(split_dict["val"].values())
-    
-    drop_cols = ["Unit Number", "Dataset", "RUL"]
-    
-    # Separate features (X) and target (y)
-    X_train = train_df.drop(columns=drop_cols, errors="ignore")
-    y_train = train_df[["RUL"]]
-    
-    X_val = val_df.drop(columns=drop_cols, errors="ignore")
-    y_val = val_df[["RUL"]]
-
-    feature_scaler = MinMaxScaler()
-    X_train_scaled = feature_scaler.fit_transform(X_train)
-    X_val_scaled = feature_scaler.transform(X_val)
-    
-    target_scaler = MinMaxScaler()
-    y_train_scaled = target_scaler.fit_transform(y_train)
-    y_val_scaled = target_scaler.transform(y_val)
-
-    out_dict = {}
-    out_dict["X_train_scaled"] = X_train_scaled
-    out_dict["y_train_scaled"] = y_train_scaled
-    out_dict["X_val_scaled"] = X_val_scaled
-    out_dict["y_val_scaled"] = y_val_scaled
-    out_dict["feature_scaler"] = feature_scaler
-    out_dict["target_scaler"] = target_scaler
-    return out_dict
-
 def target_feature_split(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[pd.DataFrame, pd.Series]:
     """Split the data into features (X) and target (y).
         Args: 
@@ -234,40 +200,6 @@ def target_feature_split(data_dict: Mapping[Hashable, pd.DataFrame]) -> tuple[pd
     X = df.drop(columns=drop_cols, errors="ignore")
     y = df[["RUL"]]
     return X, y
-
-def standardize_data(split_dict: Mapping[Hashable, dict[Hashable, pd.DataFrame]]) -> dict[Hashable, pd.DataFrame]:
-    """Prepares the data for LSTM by creating sequences.
-
-    Returns separated and scaled features and targets, along with their respective scalers.
-    """
-    train_df = pd.concat(split_dict["train"].values())
-    val_df = pd.concat(split_dict["val"].values())
-    
-    drop_cols = ["Unit Number", "Dataset", "RUL"]
-    
-    # Separate features (X) and target (y)
-    X_train = train_df.drop(columns=drop_cols, errors="ignore")
-    y_train = train_df[["RUL"]]
-    
-    X_val = val_df.drop(columns=drop_cols, errors="ignore")
-    y_val = val_df[["RUL"]]
-
-    feature_scaler = StandardScaler()
-    X_train_scaled = feature_scaler.fit_transform(X_train)
-    X_val_scaled = feature_scaler.transform(X_val)
-    
-    target_scaler = StandardScaler()
-    y_train_scaled = target_scaler.fit_transform(y_train)
-    y_val_scaled = target_scaler.transform(y_val)
-
-    out_dict = {}
-    out_dict["X_train_scaled"] = X_train_scaled
-    out_dict["y_train_scaled"] = y_train_scaled
-    out_dict["X_val_scaled"] = X_val_scaled
-    out_dict["y_val_scaled"] = y_val_scaled
-    out_dict["feature_scaler"] = feature_scaler
-    out_dict["target_scaler"] = target_scaler
-    return out_dict
 
 def pipeline_A(data_dict: Mapping[Hashable, pd.DataFrame]) -> dict[Hashable, dict[Hashable, pd.DataFrame]]:
     """Example pipeline that applies the preprocessing steps in sequence."""
