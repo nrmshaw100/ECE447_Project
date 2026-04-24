@@ -90,7 +90,8 @@ def compute_RUL(
 def compute_lags(
         data_dict: Mapping[Hashable, pd.DataFrame],
         sensor_cols: list[str],
-        lags: list[int] = [1, 2, 3]
+        lags: list[int] = [1, 2, 3],
+        drop_na: bool = True,
 ) -> dict[Hashable, pd.DataFrame]:
         """Compute lag features for specified sensor columns and lags, and add them as new columns.
             Args:
@@ -111,13 +112,17 @@ def compute_lags(
                 df_lag.columns = [f"{col}_lag{lag}" for col in sensor_cols]
 
                 df = df.join(df_lag)
-            lagged_data[i] = df.dropna()
+                if drop_na:
+                    lagged_data[i] = df.dropna()
+                else:
+                    lagged_data[i] = df
         return lagged_data
 
 def compute_window_features(
     data_dict: Mapping[Hashable, pd.DataFrame],
     sensor_cols: list[str],
-    window_size: int
+    window_size: int,
+    drop_na: bool = True,
 ) -> dict[Hashable, pd.DataFrame]:
     """Compute strictly historical rolling window features for each sensor.
         Args:
@@ -142,7 +147,10 @@ def compute_window_features(
             df[f"{sensor}_window{window_size}_std"] = history.groupby(df["Unit Number"]).transform(
                 lambda x: x.rolling(window=window_size, min_periods=1).std()
             )
-        windowed_data[i] = df.dropna()
+            if drop_na:
+                windowed_data[i] = df.dropna()
+            else:
+                windowed_data[i] = df
     return windowed_data
 
 def parse_data() -> dict[int, pd.DataFrame]:
