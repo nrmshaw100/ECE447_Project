@@ -1,0 +1,6 @@
+artifact_location: mlflow-artifacts:/445315167906777822
+creation_time: 1777076346820
+experiment_id: '445315167906777822'
+last_update_time: 1777076346820
+lifecycle_stage: active
+name: lstm_runs

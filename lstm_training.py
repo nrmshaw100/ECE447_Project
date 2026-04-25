@@ -10,20 +10,20 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import mlflow
 import optuna
-import optuna.visualization as vis
-from optuna.integration.mlflow import MLflowCallback
-from sklearn import linear_model
-import evaluation_and_residual as ear
 from sklearn.metrics import mean_squared_error # Changed from log_loss
 
 def main():
-    mlflow.set_tracking_uri("http://localhost:5000")
+    print("Entering main...")
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
 
     exp_name = "lstm_runs"
     mlflow.set_experiment(exp_name)
+    print("MLflow experiment set...")
     
     data_dict = preprocessing.parse_data()
+    print("Data parsed...")
 
+    print("bing")
     # pipeline A data preprocessing
     pipe_A = preprocessing.pipeline_A(data_dict)
     train_ref = pd.concat(pipe_A["train"].values(), ignore_index=True)

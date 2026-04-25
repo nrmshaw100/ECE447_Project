@@ -1,0 +1,14 @@
+artifact_uri: mlflow-artifacts:/445315167906777822/2eaf7368ed164c51a3eda4d369051522/artifacts
+end_time: 1777080624186
+entry_point_name: ''
+experiment_id: '445315167906777822'
+lifecycle_stage: active
+run_id: 2eaf7368ed164c51a3eda4d369051522
+run_name: trial_2
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777078549533
+status: 3
+tags: []
+user_id: nolan
