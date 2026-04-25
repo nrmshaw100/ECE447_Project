@@ -26,7 +26,7 @@ class LinRegObjective:
 
   def __call__(self, trial):
     with mlflow.start_run(nested=True, experiment_id=self.exp_id):
-      alpha = trial.suggest_float("alpha", 1e-3, 1e+3)
+      alpha = trial.suggest_float("alpha", 0.001, 2)
       mlflow.log_params({"alpha": alpha})
 
       reg = linear_model.Ridge(alpha=alpha)

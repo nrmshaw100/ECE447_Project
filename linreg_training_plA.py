@@ -26,7 +26,7 @@ class LinRegObjective:
 
   def __call__(self, trial):
     with mlflow.start_run(nested=True, experiment_id=self.exp_id):
-      alpha = trial.suggest_float("alpha", 1e-3, 1e+3)
+      alpha = trial.suggest_float("alpha", 0.001, 2)
       mlflow.log_params({"alpha": alpha})
 
       reg = linear_model.Ridge(alpha=alpha)
@@ -55,6 +55,10 @@ def main():
     data_dict = preprocessing.parse_data()
 
     # pipeline A data preprocessing
+    # the reason why this looks slightly different from the notebooke is because
+    # the LSTM model needs to make sure the data is split for each trial and 
+    # each turbine. as such, a reference is used for splitting. none of the
+    # values or features are different for the actual pipelines.
     pipe_A = preprocessing.pipeline_A(data_dict)
     train_ref = pd.concat(pipe_A["train"].values(), ignore_index=True)
     val_ref = pd.concat(pipe_A["val"].values(), ignore_index=True)
@@ -73,8 +77,6 @@ def main():
     val_ref_B = pd.concat(pipe_B["val"].values(), ignore_index=True)
     xB_train, yB_train = preprocessing.target_feature_split(train_ref_B)
     xB_val, yB_val = preprocessing.target_feature_split(val_ref_B)
-
-    #train-validation feature matrix and target vector
     xB_scaler = MinMaxScaler()
     yB_scaler = MinMaxScaler()
     xB_train_minMax = xB_scaler.fit_transform(xB_train)
@@ -101,7 +103,7 @@ def main():
     # Pass exp_id to your objective class
     objective = LinRegObjective(xA_train, yA_train, xA_val, yA_val, exp_id)
 
-    with mlflow.start_run(run_name="pipeline_A"):
+    with mlflow.start_run(run_name="pipeline_A_lasso"):
         study = optuna.create_study(direction="minimize", study_name="LinReg_Optimization")
 
         # n_trials is the total number of hyperparameter combinations to test
@@ -109,7 +111,7 @@ def main():
 
         best_params = study.best_params
         
-        best_reg = linear_model.Ridge(**best_params)
+        best_reg = linear_model.Lasso(**best_params)
         best_reg.fit(xA_train, yA_train)
         mlflow.sklearn.log_model(best_reg, artifact_path="best-model")
         mlflow.set_tag("model_status", "production_candidate")
