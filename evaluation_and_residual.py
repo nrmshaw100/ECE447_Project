@@ -53,6 +53,7 @@ def evaluate_model(model, X_test, y_test):
     print(f"Mean Absolute Error: {mse}") 
     display(model.feature_importances_)
     forecast_error_overtime_plot(y_test, predictions)
+    return predictions
 
 
 ##########################################################################
